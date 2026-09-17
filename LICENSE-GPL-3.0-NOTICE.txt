@@ -1,0 +1,6 @@
+AliVPN embeds the sing-box libbox Android library.
+
+The libbox project is licensed under GNU GPLv3.
+See: https://github.com/singbox-android/libbox
+
+This notice is included so the distribution requirements of the embedded GPL component are not obscured.
