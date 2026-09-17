@@ -18,10 +18,9 @@ import io.nekohasekai.libbox.ConnectionOwner
 import io.nekohasekai.libbox.InterfaceUpdateListener
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LocalDNSTransport
+import io.nekohasekai.libbox.NeighborUpdateListener
 import io.nekohasekai.libbox.NetworkInterface
 import io.nekohasekai.libbox.NetworkInterfaceIterator
-import io.nekohasekai.libbox.NeighborUpdateListener
-import io.nekohasekai.libbox.Notification as LibboxNotification
 import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.PlatformInterface
 import io.nekohasekai.libbox.PlatformUser
@@ -54,10 +53,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
     private var tunnelFd: android.os.ParcelFileDescriptor? = null
     private var currentConfig: String? = null
 
-    // -------------------------------------------------------------------------
-    // Android service lifecycle
-    // -------------------------------------------------------------------------
-
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -68,11 +63,7 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         flags: Int,
         startId: Int
     ): Int {
-
-        startForegroundCompat(
-            "AliVPN",
-            "Подготавливаем VPN"
-        )
+        startForegroundCompat("AliVPN", "Подготавливаем VPN")
 
         if (intent?.action == ACTION_STOP) {
             stopSelf()
@@ -80,12 +71,8 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         }
 
         val config = intent?.getStringExtra("config")
-
         if (config.isNullOrBlank()) {
-            broadcastState(
-                STATE_ERROR,
-                "Конфигурация отсутствует"
-            )
+            broadcastState(STATE_ERROR, "Конфигурация отсутствует")
             stopSelf()
             return START_NOT_STICKY
         }
@@ -98,13 +85,8 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
         Thread {
             try {
-                val server = CommandServer(
-                    this,
-                    this
-                )
-
+                val server = CommandServer(this, this)
                 server.start()
-
                 commandServer = server
 
                 server.startOrReloadService(
@@ -123,9 +105,7 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                     STATE_CONNECTING,
                     null
                 )
-
             } catch (e: Throwable) {
-
                 Log.e(
                     "AliVPN",
                     "Core start failed",
@@ -169,7 +149,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
     }
 
     private fun closeCore() {
-
         runCatching {
             tunnelFd?.close()
         }
@@ -184,14 +163,8 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         currentConfig = null
     }
 
-    // -------------------------------------------------------------------------
-    // Notifications
-    // -------------------------------------------------------------------------
-
     private fun createNotificationChannel() {
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
             val manager =
                 getSystemService(
                     NotificationManager::class.java
@@ -211,7 +184,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         title: String,
         text: String
     ) {
-
         startForeground(
             NOTIFICATION_ID,
             buildNotification(
@@ -225,7 +197,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         title: String,
         text: String
     ) {
-
         val manager =
             getSystemService(
                 NotificationManager::class.java
@@ -244,7 +215,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         title: String,
         text: String
     ): AndroidNotification {
-
         return NotificationCompat.Builder(
             this,
             CHANNEL_ID
@@ -266,7 +236,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         state: String,
         message: String?
     ) {
-
         sendBroadcast(
             Intent(ACTION_STATE)
                 .setPackage(packageName)
@@ -281,16 +250,13 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         )
     }
 
-    // -------------------------------------------------------------------------
-    // CommandServerHandler — libbox 1.14.0
-    // -------------------------------------------------------------------------
+    // CommandServerHandler
 
     override fun serviceStop() {
         stopSelf()
     }
 
     override fun serviceReload() {
-
         val config =
             currentConfig ?: return
 
@@ -304,7 +270,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
     override fun getSystemProxyStatus():
         SystemProxyStatus {
-
         return SystemProxyStatus().also {
             it.available = false
             it.enabled = false
@@ -314,7 +279,7 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
     override fun setSystemProxyEnabled(
         enabled: Boolean
     ) {
-        // AliVPN не использует системный HTTP proxy.
+        // AliVPN does not use the Android system HTTP proxy.
     }
 
     override fun triggerNativeCrash() {
@@ -324,12 +289,11 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
     }
 
     override fun writeDebugMessage(
-        message: String?
+        message: String
     ) {
-
         Log.d(
             "AliVPN",
-            message ?: ""
+            message
         )
     }
 
@@ -337,29 +301,21 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         return -1
     }
 
-    // -------------------------------------------------------------------------
-    // PlatformInterface notifications
-    //
-    // ВАЖНО:
-    // libbox.Notification != android.app.Notification
-    // -------------------------------------------------------------------------
+    // PlatformInterface notifications.
+    // These are required by libbox 1.14.0.
 
     override fun sendNotification(
-        notification: LibboxNotification
+        notification: io.nekohasekai.libbox.Notification
     ) {
-
         val title =
-            notification.title
-                .ifBlank {
-                    "AliVPN"
-                }
+            notification.title.ifBlank {
+                "AliVPN"
+            }
 
         val text =
             buildString {
-
                 if (
-                    notification.subtitle
-                        .isNotBlank()
+                    notification.subtitle.isNotBlank()
                 ) {
                     append(
                         notification.subtitle
@@ -367,10 +323,8 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                 }
 
                 if (
-                    notification.body
-                        .isNotBlank()
+                    notification.body.isNotBlank()
                 ) {
-
                     if (isNotEmpty()) {
                         append(" — ")
                     }
@@ -395,7 +349,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         identifier: String,
         typeID: Int
     ) {
-
         getSystemService(
             NotificationManager::class.java
         ).cancel(
@@ -404,28 +357,22 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         )
     }
 
-    // -------------------------------------------------------------------------
     // PlatformInterface
-    // -------------------------------------------------------------------------
 
     override fun localDNSTransport():
         LocalDNSTransport? {
-
         return null
     }
 
     override fun usePlatformAutoDetectInterfaceControl():
         Boolean {
-
         return true
     }
 
     override fun autoDetectInterfaceControl(
         fd: Int
     ) {
-
         if (!protect(fd)) {
-
             Log.w(
                 "AliVPN",
                 "protect($fd) failed"
@@ -433,9 +380,7 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         }
     }
 
-    // -------------------------------------------------------------------------
     // TUN
-    // -------------------------------------------------------------------------
 
     override fun openTun(
         options: TunOptions
@@ -461,15 +406,12 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             builder.setMetered(false)
         }
 
-        // IPv4 address
-
         val ipv4 =
             options.inet4Address
 
         while (
             ipv4.hasNext()
         ) {
-
             val prefix =
                 ipv4.next()
 
@@ -479,15 +421,12 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             )
         }
 
-        // IPv6 address
-
         val ipv6 =
             options.inet6Address
 
         while (
             ipv6.hasNext()
         ) {
-
             val prefix =
                 ipv6.next()
 
@@ -499,28 +438,21 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
         if (options.autoRoute) {
 
-            // DNS
-
             val dns =
                 options.dnsServerAddress
 
             while (
                 dns.hasNext()
             ) {
-
                 builder.addDnsServer(
                     dns.next()
                 )
             }
 
-            // Android 13+
-
             if (
                 Build.VERSION.SDK_INT >=
                 Build.VERSION_CODES.TIRAMISU
             ) {
-
-                // IPv4 routes
 
                 val routes4 =
                     options.inet4RouteAddress
@@ -528,7 +460,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                 while (
                     routes4.hasNext()
                 ) {
-
                     val route =
                         routes4.next()
 
@@ -537,15 +468,12 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                     )
                 }
 
-                // IPv6 routes
-
                 val routes6 =
                     options.inet6RouteAddress
 
                 while (
                     routes6.hasNext()
                 ) {
-
                     val route =
                         routes6.next()
 
@@ -554,15 +482,12 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                     )
                 }
 
-                // IPv4 excluded routes
-
                 val excluded4 =
                     options.inet4RouteExcludeAddress
 
                 while (
                     excluded4.hasNext()
                 ) {
-
                     val route =
                         excluded4.next()
 
@@ -571,15 +496,12 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                     )
                 }
 
-                // IPv6 excluded routes
-
                 val excluded6 =
                     options.inet6RouteExcludeAddress
 
                 while (
                     excluded6.hasNext()
                 ) {
-
                     val route =
                         excluded6.next()
 
@@ -590,15 +512,12 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
             } else {
 
-                // Android < 13
-
                 val routes4 =
                     options.inet4RouteRange
 
                 while (
                     routes4.hasNext()
                 ) {
-
                     val route =
                         routes4.next()
 
@@ -616,7 +535,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                 while (
                     routes6.hasNext()
                 ) {
-
                     val route =
                         routes6.next()
 
@@ -630,23 +548,17 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             }
         }
 
-        // Allowed applications
-
         val included =
             options.includePackage
 
         while (
             included.hasNext()
         ) {
-
             runCatching {
-
                 builder.addAllowedApplication(
                     included.next()
                 )
-
             }.onFailure {
-
                 Log.w(
                     "AliVPN",
                     "Unable to add allowed package",
@@ -655,23 +567,17 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             }
         }
 
-        // Disallowed applications
-
         val excluded =
             options.excludePackage
 
         while (
             excluded.hasNext()
         ) {
-
             runCatching {
-
                 builder.addDisallowedApplication(
                     excluded.next()
                 )
-
             }.onFailure {
-
                 Log.w(
                     "AliVPN",
                     "Unable to add disallowed package",
@@ -680,14 +586,11 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             }
         }
 
-        // HTTP proxy
-
         if (
             options.isHTTPProxyEnabled &&
             Build.VERSION.SDK_INT >=
             Build.VERSION_CODES.Q
         ) {
-
             builder.setHttpProxy(
                 ProxyInfo.buildDirectProxy(
                     options.httpProxyServer,
@@ -695,8 +598,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                 )
             )
         }
-
-        // Establish TUN
 
         tunnelFd?.close()
 
@@ -712,7 +613,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
     private fun toIpPrefix(
         route: io.nekohasekai.libbox.RoutePrefix
     ): IpPrefix {
-
         return IpPrefix(
             InetAddress.getByName(
                 route.address()
@@ -721,12 +621,9 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         )
     }
 
-    // -------------------------------------------------------------------------
     // Connection owner
-    // -------------------------------------------------------------------------
 
     override fun useProcFS(): Boolean {
-
         return Build.VERSION.SDK_INT <
             Build.VERSION_CODES.Q
     }
@@ -743,7 +640,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             Build.VERSION.SDK_INT <
             Build.VERSION_CODES.Q
         ) {
-
             error(
                 "Connection owner API requires Android 10+"
             )
@@ -768,7 +664,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
             )
 
         if (uid < 0) {
-
             error(
                 "Connection owner not found"
             )
@@ -799,25 +694,21 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Default interface monitor
-    // -------------------------------------------------------------------------
+    // Interface monitor
 
     override fun startDefaultInterfaceMonitor(
         listener: InterfaceUpdateListener
     ) {
-        // Не требуется для минимального клиента.
+        // Android VpnService handles the active network.
     }
 
     override fun closeDefaultInterfaceMonitor(
         listener: InterfaceUpdateListener
     ) {
-        // Не требуется для минимального клиента.
+        // Nothing to close.
     }
 
-    // -------------------------------------------------------------------------
     // Network interfaces
-    // -------------------------------------------------------------------------
 
     override fun getInterfaces():
         NetworkInterfaceIterator {
@@ -861,7 +752,7 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                 }
                     ?: continue
 
-            val boxInterface =
+            val networkInterface =
                 NetworkInterface().also {
 
                     it.name = name
@@ -889,23 +780,14 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                         StringArray(
                             linkProperties
                                 .routes
-                                .filter {
-                                    route ->
-                                    route.destination
-                                        .prefixLength == 0
-                                }
-                                .mapNotNull {
-                                    route ->
+                                .mapNotNull { route ->
                                     route.gateway
-                                }
-                                .filterNot {
-                                    gateway ->
-                                    gateway
-                                        .isAnyLocalAddress
-                                }
-                                .mapNotNull {
-                                    gateway ->
-                                    gateway.hostAddress
+                                        ?.takeIf {
+                                            gateway ->
+                                            !gateway
+                                                .isAnyLocalAddress
+                                        }
+                                        ?.hostAddress
                                 }
                                 .iterator()
                         )
@@ -915,7 +797,11 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                             javaInterface
                                 .interfaceAddresses
                                 .map { address ->
-                                    "${address.address.hostAddress}/${address.networkPrefixLength}"
+                                    val host =
+                                        address.address
+                                            .hostAddress
+
+                                    "$host/${address.networkPrefixLength}"
                                 }
                                 .iterator()
                         )
@@ -954,7 +840,7 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
                     it.flags = 0
                 }
 
-            result += boxInterface
+            result += networkInterface
         }
 
         val iterator =
@@ -965,74 +851,63 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
             override fun hasNext():
                 Boolean {
-
                 return iterator.hasNext()
             }
 
             override fun next():
                 NetworkInterface {
-
                 return iterator.next()
             }
         }
     }
 
-    // -------------------------------------------------------------------------
     // Other platform functions
-    // -------------------------------------------------------------------------
 
     override fun underNetworkExtension():
         Boolean {
-
         return false
     }
 
     override fun includeAllNetworks():
         Boolean {
-
         return false
     }
 
     override fun readWIFIState():
         WIFIState? {
-
         return null
     }
 
     override fun clearDNSCache() {
-        // Нет локального DNS-кэша приложения.
+        // Nothing to clear.
     }
 
     override fun startNeighborMonitor(
         listener: NeighborUpdateListener
     ) {
-        // Не требуется.
+        // Not required for AliVPN.
     }
 
     override fun closeNeighborMonitor(
         listener: NeighborUpdateListener
     ) {
-        // Не требуется.
+        // Not required for AliVPN.
     }
 
     override fun registerMyInterface(
         name: String
     ) {
-        // Ничего регистрировать не нужно.
+        // Nothing to register.
     }
 
-    // -------------------------------------------------------------------------
-    // Shell — unsupported
-    // -------------------------------------------------------------------------
+    // Shell
 
     override fun usePlatformShell():
         Boolean {
-
         return false
     }
 
     override fun checkPlatformShell() {
-
         error(
             "Shell access is not available"
         )
@@ -1077,7 +952,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
     override fun lookupSFTPServer():
         String {
-
         error(
             "SFTP server is not available"
         )
@@ -1085,7 +959,6 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
 
     override fun readSystemSSHHostKey():
         String {
-
         error(
             "SSH host key is not available"
         )
@@ -1097,13 +970,10 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         return "${Build.MANUFACTURER} ${Build.MODEL}"
     }
 
-    // -------------------------------------------------------------------------
-    // Bridge — unsupported
-    // -------------------------------------------------------------------------
+    // Bridge
 
     override fun usePlatformBridge():
         Boolean {
-
         return false
     }
 
@@ -1116,34 +986,29 @@ class AliVpnService : VpnService(), PlatformInterface, CommandServerHandler {
         )
     }
 
-    // -------------------------------------------------------------------------
-    // StringIterator adapter
-    // -------------------------------------------------------------------------
-
     private class StringArray(
         values: Iterator<String>
     ) : StringIterator {
 
         private val data =
-            values.asSequence().toList()
+            values.asSequence()
+                .toList()
 
-        private var index = 0
+        private var index =
+            0
 
         override fun len():
             Int {
-
             return data.size
         }
 
         override fun hasNext():
             Boolean {
-
             return index < data.size
         }
 
         override fun next():
             String {
-
             return data[index++]
         }
     }
